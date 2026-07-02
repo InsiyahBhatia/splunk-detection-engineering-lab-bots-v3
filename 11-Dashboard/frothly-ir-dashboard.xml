@@ -1,0 +1,272 @@
+<?xml version="1.0" encoding="utf-8"?>
+<dashboard version="1.1">
+  <label>Frothly BOTSv3 - Incident Response Dashboard</label>
+  <description>Correlated view of compromised credentials, multi-region sweeps, and endpoint mining activity from IR-2018-001, IR-2018-002, and IR-2026-0701-001. Author: Insiyah Bhatia</description>
+  <fieldset submitButton="true" autoRun="true">
+    <input type="time" token="time_range" searchWhenChanged="true">
+      <label>Time Range</label>
+      <default>
+        <earliest>1534723200</earliest>
+        <latest>1534809599</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <!-- Row 1: Critical Alerts -->
+  <row>
+    <panel>
+      <title>Active Critical Alerts - CloudTrail (T1496 Resource Hijacking)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com" eventName="RunInstances"
+| bin _time span=10m
+| stats dc(awsRegion) as distinct_regions, count as total_attempts, values(awsRegion) as regions_targeted, values(errorCode) as error_codes, values(sourceIPAddress) as source_ips by userIdentity.accessKeyId, _time
+| where distinct_regions &gt;= 5
+| eval severity = "CRITICAL"
+| eval mitre = "T1496 / T1526"
+| table _time userIdentity.accessKeyId distinct_regions total_attempts regions_targeted error_codes source_ips severity</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- Row 2: IAM Reconnaissance Burst -->
+  <row>
+    <panel>
+      <title>IAM Reconnaissance Burst (T1580)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="aws:cloudtrail" eventSource="iam.amazonaws.com" eventName IN ("GetCallerIdentity","ListAccessKeys","CreateAccessKey","DeleteAccessKey","CreateUser","GetSessionToken")
+| bin _time span=60s
+| stats dc(eventName) as distinct_sensitive_calls, values(eventName) as actions_called, values(errorCode) as outcomes, values(sourceIPAddress) as src_ips by userIdentity.accessKeyId, _time
+| where distinct_sensitive_calls &gt;= 4
+| eval severity = "HIGH"
+| eval mitre = "T1580 / T1087.003 / T1136.003 / T1098.001 / T1070"
+| table _time userIdentity.accessKeyId distinct_sensitive_calls actions_called outcomes src_ips severity</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+        <option name="rowNumbers">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- Row 3: RunInstances Error Breakdown -->
+  <row>
+    <panel>
+      <title>RunInstances Error Code Breakdown</title>
+      <chart>
+        <search>
+          <query>index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com" eventName="RunInstances"
+| stats count by errorCode
+| sort - count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.legend.placement">right</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>RunInstances by Region</title>
+      <chart>
+        <search>
+          <query>index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com" eventName="RunInstances"
+| stats count by awsRegion
+| sort - count</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.legend.placement">none</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- Row 4: S3 ACL Changes and Cryptominer DNS -->
+  <row>
+    <panel>
+      <title>S3 Bucket ACL Changes (T1530)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="aws:cloudtrail" eventName="PutBucketAcl"
+| eval severity = "HIGH"
+| eval mitre = "T1530"
+| table _time userIdentity.userName requestParameters.bucketName sourceIPAddress severity mitre
+| sort _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Cryptominer DNS Resolutions (T1496)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="stream:dns" (query="*coinhive*" OR query="*monero*" OR query="*cryptoloot*")
+| eval severity = "HIGH"
+| eval mitre = "T1496"
+| table _time host query query_type answer severity mitre
+| sort _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- Row 5: C2 Beaconing and IMDS Queries -->
+  <row>
+    <panel>
+      <title>Non-Standard Port C2 Traffic - Port 9998 (T1571)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="stream:tcp" dest_port=9998
+| eval severity = "HIGH"
+| eval mitre = "T1571"
+| table _time host src_ip dest_ip dest_port bytes_in bytes_out severity mitre
+| sort _time</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>IMDS Credential Access Cadence (T1552.005)</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="stream:http" dest_ip="169.254.169.254" uri_path="*iam/security-credentials*"
+| bin _time span=1h
+| stats earliest(_time) as first_seen, count as query_count by host, _time
+| eval first_seen = strftime(first_seen, "%Y-%m-%d %H:%M:%S")
+| eval severity = "CRITICAL"
+| eval mitre = "T1552.005"
+| table first_seen host query_count severity mitre
+| sort first_seen</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <!-- Row 6: Symantec AV Detections -->
+  <row>
+    <panel>
+      <title>Symantec EP Cryptominer Detections</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="symantec:ep:security:file" ("*coinminer*" OR "*JSCoinminer*" OR "*coin miner*")
+| rex field=_raw "^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2},\w+,(?&lt;endpoint_host&gt;[^,]+),"
+| rex field=_raw "\[SID:\s*(?&lt;signature_id&gt;\d+)\]"
+| rex field=_raw "CIDS Signature string:\s*(?&lt;signature_name&gt;[^,]+),"
+| rex field=_raw "User:\s*(?&lt;user_name&gt;[^,]+),"
+| rex field=_raw "Application:\s*(?&lt;file_path&gt;[^,]+),"
+| rex field=_raw "Remote:\s*(?&lt;remote_ip&gt;\d+\.\d+\.\d+\.\d+)"
+| eval severity = "MEDIUM"
+| eval mitre = "T1496"
+| table _time endpoint_host user_name file_path signature_name signature_id remote_ip severity mitre</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+    <panel>
+      <title>osquery - IR Tooling Execution</title>
+      <table>
+        <search>
+          <query>index="botsv3" sourcetype="osquery:results" (columns.cmdline="*aws_ir*" OR columns.cmdline="*AKIA*")
+| table _time host name columns.cmdline columns.pid</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+<!-- Row 7: Timeline Visualization -->
+  <row>
+    <panel>
+      <title>Incident Timeline - Attack Chain Overview</title>
+      <chart>
+        <search>
+          <query>index="botsv3" earliest=1534723200 latest=1534809599
+  (sourcetype="aws:cloudtrail" eventName IN ("RunInstances","PutBucketAcl","GetSessionToken","GetCallerIdentity","ListAccessKeys","CreateAccessKey","CreateUser")) OR
+  (sourcetype="stream:tcp" dest_port=9998) OR
+  (sourcetype="stream:dns" query="*coinhive*") OR
+  (sourcetype="stream:http" dest_ip="169.254.169.254") OR
+  (sourcetype="osquery:results" columns.cmdline="*aws_ir*") OR
+  (sourcetype="symantec:ep:security:file" ("*coinminer*" OR "*JSCoinminer*"))
+| eval event_type = case(
+    eventName="RunInstances", "EC2 Sweep",
+    eventName="PutBucketAcl", "S3 ACL Change",
+    eventName IN ("GetCallerIdentity","ListAccessKeys","CreateAccessKey","DeleteAccessKey","CreateUser","GetSessionToken"), "IAM Activity",
+    sourcetype="stream:tcp" AND dest_port=9998, "C2 Beacon",
+    sourcetype="stream:dns" AND (query="*coinhive*" OR query="*monero*"), "Miner DNS",
+    sourcetype="stream:http" AND dest_ip="169.254.169.254", "IMDS Query",
+    sourcetype="osquery:results" AND columns.cmdline="*aws_ir*", "IR Response",
+    sourcetype="symantec:ep:security:file", "AV Block",
+    true(), "Other")
+| timechart count by event_type span=30m limit=10</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.legend.placement">bottom</option>
+        <option name="charting.drilldown">none</option>
+      </chart>
+    </panel>
+  </row>
+
+  <!-- Row 8: MITRE ATT and CK Coverage -->
+  <row>
+    <panel>
+      <title>MITRE ATT&amp;CK Techniques Observed</title>
+      <table>
+        <search>
+          <query>index="botsv3" earliest=1534723200 latest=1534809599
+  (sourcetype="aws:cloudtrail") OR
+  (sourcetype="stream:tcp" dest_port=9998) OR
+  (sourcetype="stream:dns" query="*coinhive*") OR
+  (sourcetype="stream:http" dest_ip="169.254.169.254") OR
+  (sourcetype="symantec:ep:security:file" ("*coinminer*" OR "*JSCoinminer*"))
+| eval mitre_id = case(
+    eventName="RunInstances", "T1496",
+    eventName="PutBucketAcl", "T1530",
+    eventName="GetCallerIdentity", "T1580",
+    eventName="ListAccessKeys", "T1087.003",
+    eventName="CreateAccessKey", "T1098.001",
+    eventName="CreateUser", "T1136.003",
+    eventName="DeleteAccessKey", "T1070",
+    eventName="GetSessionToken", "T1078.004",
+    sourcetype="stream:tcp" AND dest_port=9998, "T1571",
+    sourcetype="stream:dns" AND (query="*coinhive*" OR query="*monero*"), "T1496",
+    sourcetype="stream:http" AND dest_ip="169.254.169.254", "T1552.005",
+    sourcetype="symantec:ep:security:file", "T1496",
+    true(), "UNMAPPED")
+| stats dc(_time) as events, count as total by mitre_id
+| sort - total</query>
+          <earliest>$time_range.earliest$</earliest>
+          <latest>$time_range.latest$</latest>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

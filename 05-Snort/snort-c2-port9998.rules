@@ -1,0 +1,148 @@
+# Snort Rules: C2 Beaconing & Payload Delivery Detection
+# Author: Insiyah
+# Date: 2026-07-02
+# Reference: IR-2018-001 - BOTS v3 EC2 Compromise & AWS Credential Abuse
+# Description: Detects C2 beacon patterns and large payload delivery over
+#              non-standard port 9998, observed on compromised EC2 instance
+#              mars.i-08e52f8b5a034012d communicating with 34.215.24.225
+#
+# Evidence basis:
+#   - Fixed 74-byte outbound / 54-byte inbound beacon pairs at regular intervals
+#   - 11.7MB inbound payload delivery at 14:34:13 UTC (pre-credential theft)
+#   - 2.9MB second-stage transfer at 18:24:34 UTC (post-IR response)
+#   - All traffic on TCP/9998 - non-standard, not used by any known Frothly application
+#
+# MITRE: T1571 (Non-Standard Port), T1105 (Ingress Tool Transfer)
+# -----------------------------------------------------------------------
+
+
+# -----------------------------------------------------------------------
+# RULE 1: C2 Beacon - Fixed Small Packet Pattern on Non-Standard Port
+# Triggers on: repeated small TCP connections to external IP on port 9998
+# Rationale: 74-byte outbound keepalives observed at ~5-minute intervals
+#            are consistent with C2 heartbeat/check-in behavior
+# -----------------------------------------------------------------------
+alert tcp $HOME_NET any -> $EXTERNAL_NET 9998 \
+    (msg:"THREAT-C2 Outbound beacon on non-standard port 9998"; \
+     flags:PA; \
+     dsize:50<>100; \
+     detection_filter:track by_src, count 3, seconds 600; \
+     classtype:trojan-activity; \
+     priority:1; \
+     sid:9000001; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-001, \
+               mitre_technique T1571, \
+               created 2026-07-02;)
+
+
+# -----------------------------------------------------------------------
+# RULE 2: C2 Response - Inbound Small Packet on Port 9998
+# Triggers on: inbound small packets on 9998 matching beacon response size
+# Rationale: 54-byte inbound pairs observed alongside each 74-byte outbound
+#            beacon - classic bidirectional C2 keepalive handshake
+# -----------------------------------------------------------------------
+alert tcp $EXTERNAL_NET 9998 -> $HOME_NET any \
+    (msg:"THREAT-C2 Inbound beacon response on non-standard port 9998"; \
+     flags:PA; \
+     dsize:40<>80; \
+     detection_filter:track by_dst, count 3, seconds 600; \
+     classtype:trojan-activity; \
+     priority:1; \
+     sid:9000002; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-001, \
+               mitre_technique T1571, \
+               created 2026-07-02;)
+
+
+# -----------------------------------------------------------------------
+# RULE 3: Large Inbound Payload Delivery on Port 9998
+# Triggers on: large inbound data transfer on TCP/9998 from external host
+# Rationale: 11.7MB inbound at 14:34 preceded all credential theft activity
+#            - payload delivery before IMDS query confirms execution sequence
+# Threshold: >500KB inbound on this port is anomalous for any known service
+# -----------------------------------------------------------------------
+alert tcp $EXTERNAL_NET 9998 -> $HOME_NET any \
+    (msg:"THREAT-C2 Large inbound payload delivery on port 9998 - possible tool transfer"; \
+     flags:PA; \
+     dsize:>1460; \
+     flow:established,to_client; \
+     detection_filter:track by_dst, count 10, seconds 30; \
+     classtype:trojan-activity; \
+     priority:1; \
+     sid:9000003; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-001, \
+               mitre_technique T1105, \
+               created 2026-07-02;)
+
+
+# -----------------------------------------------------------------------
+# RULE 4: Any Outbound Connection to Known C2 IP
+# Triggers on: any traffic to 34.215.24.225 from internal network
+# Rationale: Direct IOC match - confirmed C2 infrastructure from IR-2018-001
+# Note: IOC-based rules have a short useful life; remove/expire after
+#       confirming IP is no longer active or reassigned
+# Expiry recommendation: 90 days from incident date (2018-11-18)
+# -----------------------------------------------------------------------
+alert ip $HOME_NET any -> 34.215.24.225 any \
+    (msg:"THREAT-C2 Outbound connection to confirmed C2 IP 34.215.24.225 [IR-2018-001]"; \
+     classtype:trojan-activity; \
+     priority:1; \
+     sid:9000004; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-001, \
+               mitre_technique T1571, \
+               ioc_type ip, \
+               ioc_expiry 2018-11-18, \
+               created 2026-07-02;)
+
+
+# -----------------------------------------------------------------------
+# RULE 5: Non-Standard High Port Outbound - Broadened Detection
+# Triggers on: any outbound TCP on ports 9990-9999 (C2 port neighborhood)
+# Rationale: Attackers often use port ranges, not single ports - this
+#            catches variants using adjacent non-standard ports
+# Note: Higher false positive potential - tune $HOME_NET and whitelist
+#       known legitimate applications on these ports before enabling
+# -----------------------------------------------------------------------
+alert tcp $HOME_NET any -> $EXTERNAL_NET 9990:9999 \
+    (msg:"POLICY Outbound TCP on non-standard high port range 9990-9999 - possible C2"; \
+     flags:S; \
+     classtype:policy-violation; \
+     priority:2; \
+     sid:9000005; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-001, \
+               mitre_technique T1571, \
+               note "Tune before production - whitelist legitimate services", \
+               created 2026-07-02;)
+
+
+# -----------------------------------------------------------------------
+# RULE 6: Coinhive Mining Pool WebSocket Connection (pairs with YARA)
+# Triggers on: outbound WebSocket upgrades to known Coinhive mining domains
+# Rationale: BSTOLL-L, MKRAEUS-L, BTUN-L all resolved ws001-014.coinhive.com
+#            DNS queries resolved to mining pool IPs for browser crypto mining
+# Reference: IR-2018-002
+# -----------------------------------------------------------------------
+alert tcp $HOME_NET any -> $EXTERNAL_NET 443 \
+    (msg:"THREAT-IMPACT JSCoinminer WebSocket connection to Coinhive mining pool [IR-2018-002]"; \
+     flow:established,to_server; \
+     content:"GET "; depth:4; \
+     content:"Upgrade|3a 20|websocket"; nocase; \
+     content:"coinhive.com"; nocase; \
+     classtype:trojan-activity; \
+     priority:1; \
+     sid:9000006; \
+     rev:1; \
+     metadata:author Insiyah, \
+               report IR-2018-002, \
+               mitre_technique T1496, \
+               created 2026-07-02;)

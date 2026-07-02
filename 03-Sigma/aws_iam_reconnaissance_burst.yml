@@ -1,0 +1,45 @@
+title: AWS IAM Reconnaissance Burst by Single Identity
+id: 7a3f1e2c-4b8d-4a1f-9c6e-2d5f8a1b3c9e
+status: experimental
+description: >
+    Detects a burst of sensitive, low-frequency IAM API calls (identity checks,
+    key enumeration, key creation/deletion, user creation) made by the same
+    access key within a short time window. This pattern is consistent with an
+    attacker using a compromised credential/session token to probe what
+    permissions it holds and attempt privilege escalation or persistence.
+references:
+    - https://github.com/splunk/botsv3
+author: Insiyah Bhatia
+date: 2026-07-01
+tags:
+    - attack.discovery
+    - attack.t1078.004
+    - attack.t1098.001
+    - attack.t1136.003
+    - attack.t1070
+logsource:
+    product: aws
+    service: cloudtrail
+detection:
+    selection_sensitive_actions:
+        eventSource: iam.amazonaws.com
+        eventName:
+            - GetCallerIdentity
+            - ListAccessKeys
+            - CreateAccessKey
+            - DeleteAccessKey
+            - CreateUser
+            - GetSessionToken
+    timeframe: 1m
+    condition: selection_sensitive_actions | count(eventName) by userIdentity.accessKeyId >= 4
+falsepositives:
+    - Legitimate automated credential-rotation tooling or IAM auditing scripts.
+    - CI/CD pipelines that provision IAM resources programmatically.
+level: high
+
+# --- Splunk SPL equivalent (for BOTS v3 / botsv3 index) ---
+# index="botsv3" sourcetype="aws:cloudtrail" eventSource="iam.amazonaws.com"
+#   eventName IN ("GetCallerIdentity","ListAccessKeys","CreateAccessKey","DeleteAccessKey","CreateUser","GetSessionToken")
+# | bin _time span=60s
+# | stats dc(eventName) as distinct_sensitive_calls, values(eventName) as actions, values(errorCode) as outcomes by userIdentity.accessKeyId, _time
+# | where distinct_sensitive_calls >= 4

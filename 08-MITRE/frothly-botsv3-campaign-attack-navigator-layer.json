@@ -1,0 +1,157 @@
+{
+  "version": "4.5",
+  "name": "BOTSv3 - Frothly Incident Campaign (August 20, 2018)",
+  "description": "Combined MITRE ATT&CK mapping for three parallel incidents from BOTSv3 dataset: IR-2018-001 (EC2 IMDS Credential Theft), IR-2018-002 (S3 Misconfiguration + Cryptominer), IR-2026-0701-001 (Multi-Region RunInstances Sweep). All incidents occurred on 2018-08-20. Author: Insiyah Bhatia",
+  "domain": "mitre-enterprise",
+  "techniques": [
+    {
+      "techniqueID": "T1078.004",
+      "tactic": "initial-access",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: Compromised web_admin IAM credentials used directly via stolen IMDS credentials; IR-2026-0701-001: Compromised web_admin credentials used directly (no AssumeRole)"
+    },
+    {
+      "techniqueID": "T1105",
+      "tactic": "command-and-control",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: 11.7MB malicious payload delivered to mars.i-08e52f8b5a034012d from 34.215.24.225:9998"
+    },
+    {
+      "techniqueID": "T1571",
+      "tactic": "command-and-control",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: Non-standard port 9998 used for C2 beaconing to 34.215.24.225; continued 4+ hours post-containment"
+    },
+    {
+      "techniqueID": "T1552.005",
+      "tactic": "credential-access",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: Malware queried IMDS at 169.254.169.254/latest/meta-data/iam/security-credentials/EC2InstanceRole (HTTP 200) — IMDSv1 in use"
+    },
+    {
+      "techniqueID": "T1580",
+      "tactic": "discovery",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: IAM enumeration burst (6 API calls in <1 sec: GetCallerIdentity, GetSessionToken, ListAccessKeys, CreateAccessKey, DeleteAccessKey, CreateUser); IR-2026-0701-001: Multi-region RunInstances sweep doubles as capability mapping"
+    },
+    {
+      "techniqueID": "T1136.003",
+      "tactic": "persistence",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: CreateUser (my_db_user) attempted — AccessDenied by IAM policy"
+    },
+    {
+      "techniqueID": "T1098.001",
+      "tactic": "persistence",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: CreateAccessKey attempted — AccessDenied by IAM policy"
+    },
+    {
+      "techniqueID": "T1070",
+      "tactic": "defense-evasion",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: DeleteAccessKey attempted — AccessDenied (anti-forensics attempt)"
+    },
+    {
+      "techniqueID": "T1496",
+      "tactic": "impact",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: 576 RunInstances attempts across 15 regions (0 successful); IR-2018-002: Coinhive Monero miner executing in browsers via WebSocket; IR-2026-0701-001: Multi-region RunInstances sweep across ≥10 regions for cryptomining/botnet"
+    },
+    {
+      "techniqueID": "T1041",
+      "tactic": "exfiltration",
+      "score": 1,
+      "color": "#ff6666",
+      "comment": "IR-2018-001: 2.9MB inbound / 59KB outbound at 18:24:34 — possible second stage or exfiltration over C2"
+    },
+    {
+      "techniqueID": "T1189",
+      "tactic": "initial-access",
+      "score": 1,
+      "color": "#ff9966",
+      "comment": "IR-2018-002: Coinhive JS delivered via brewertalk.com browsing session in Chrome (drive-by compromise)"
+    },
+    {
+      "techniqueID": "T1608",
+      "tactic": "resource-development",
+      "score": 1,
+      "color": "#ff9966",
+      "comment": "IR-2018-002: Attacker uploaded Coinhive miner payload to exposed frothlywebcode S3 bucket"
+    },
+    {
+      "techniqueID": "T1530",
+      "tactic": "collection",
+      "score": 1,
+      "color": "#ff9966",
+      "comment": "IR-2018-002: S3 bucket frothlywebcode publicly writable for 56 minutes via accidental PutBucketAcl by bstoll"
+    },
+    {
+      "techniqueID": "T1087.003",
+      "tactic": "discovery",
+      "score": 1,
+      "color": "#66cc66",
+      "comment": "IR-2026-0701-001: ListAccessKeys on web_admin for credential enumeration"
+    },
+    {
+      "techniqueID": "T1526",
+      "tactic": "discovery",
+      "score": 1,
+      "color": "#66cc66",
+      "comment": "IR-2026-0701-001: Multi-region RunInstances sweep (recon + action combined) across ≥10 regions"
+    },
+    {
+      "techniqueID": "T1552.001",
+      "tactic": "credential-access",
+      "score": 1,
+      "color": "#66cc66",
+      "comment": "IR-2026-0701-001: Root cause hypothesized as credentials in files (phishing/leak); no conclusive evidence"
+    }
+  ],
+  "gradient": {
+    "colors": ["#ffffff", "#ff6666"],
+    "minValue": 0,
+    "maxValue": 1
+  },
+  "legendItems": [
+    {
+      "label": "IR-2018-001: EC2 IMDS Credential Theft & Cloud Abuse",
+      "color": "#ff6666"
+    },
+    {
+      "label": "IR-2018-002: S3 Misconfiguration & Drive-By Cryptominer",
+      "color": "#ff9966"
+    },
+    {
+      "label": "IR-2026-0701-001: Multi-Region RunInstances Sweep",
+      "color": "#66cc66"
+    }
+  ],
+  "metadata": [
+    {
+      "name": "author",
+      "value": "Insiyah Bhatia"
+    },
+    {
+      "name": "dataset",
+      "value": "BOTSv3 (index=botsv3)"
+    },
+    {
+      "name": "incident_date",
+      "value": "2018-08-20"
+    },
+    {
+      "name": "analysis_date",
+      "value": "2026-07-02"
+    }
+  ]
+}

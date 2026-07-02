@@ -1,0 +1,41 @@
+title: AWS EC2 RunInstances Sweep Across Multiple Regions
+id: 9d2c7f4a-1e6b-4f3a-8b2d-5c9a7e1f4d6b
+status: experimental
+description: >
+    Detects the same AWS access key attempting RunInstances calls across an
+    unusually high number of distinct regions within a short window. This is
+    consistent with an attacker using a compromised credential to attempt
+    large-scale, multi-region compute provisioning for resource hijacking
+    (e.g. cryptomining or botnet infrastructure), regardless of whether the
+    calls ultimately succeed or fail on authorization/quota.
+references:
+    - https://github.com/splunk/botsv3
+author: Insiyah Bhatia
+date: 2026-07-01
+tags:
+    - attack.impact
+    - attack.t1496
+    - attack.t1078.004
+logsource:
+    product: aws
+    service: cloudtrail
+detection:
+    selection:
+        eventSource: ec2.amazonaws.com
+        eventName: RunInstances
+    timeframe: 10m
+    condition: selection | count(awsRegion) by userIdentity.accessKeyId >= 5
+falsepositives:
+    - Legitimate multi-region infrastructure-as-code deployments (Terraform,
+      CloudFormation StackSets) launched by automation accounts.
+    - Disaster-recovery failover scripts that provision standby capacity
+      across regions.
+level: critical
+
+# --- Splunk SPL equivalent (for BOTS v3 / botsv3 index) ---
+# index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com" eventName="RunInstances"
+# | bin _time span=10m
+# | stats dc(awsRegion) as distinct_regions, count as attempts,
+#         values(errorCode) as outcomes, values(sourceIPAddress) as source_ips
+#         by userIdentity.accessKeyId, _time
+# | where distinct_regions >= 5

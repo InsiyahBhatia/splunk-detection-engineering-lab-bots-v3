@@ -1,0 +1,48 @@
+name: Validate Sigma Rules
+
+on:
+  push:
+    paths:
+      - '03-Sigma/**'
+      - '.github/workflows/validate-sigma-rules.yml'
+  pull_request:
+    paths:
+      - '03-Sigma/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install sigma-cli and Splunk backend
+        run: |
+          pip install sigma-cli pysigma-backend-splunk
+
+      - name: Validate Sigma rule syntax
+        run: |
+          echo "Checking YAML syntax and Sigma schema compliance..."
+          for rule in 03-Sigma/*.yml; do
+            echo "---"
+            echo "Validating: $rule"
+            sigma check "$rule"
+          done
+
+      - name: Test conversion to Splunk SPL backend
+        run: |
+          echo "Confirming each rule converts cleanly to SPL..."
+          for rule in 03-Sigma/*.yml; do
+            echo "---"
+            echo "Converting: $rule"
+            sigma convert -t splunk -p splunk_windows "$rule" || sigma convert -t splunk "$rule"
+          done
+
+      - name: Summary
+        if: success()
+        run: echo "✅ All Sigma rules passed schema validation and Splunk SPL conversion."
