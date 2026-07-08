@@ -43,9 +43,6 @@ rule Coinhive_JS_Miner_Generic
         $ws4 = "getHashesPerSecond" ascii wide nocase
         $ws5 = "getTotalHashes" ascii wide nocase
 
-        // Site key pattern (base58, 32 chars - Coinhive API site key format)
-        $sitekey = /[A-Za-z0-9]{32}/ ascii
-
         // Obfuscation patterns common in injected miners
         $obf1 = "atob(" ascii wide
         $obf2 = "eval(atob" ascii wide
@@ -57,10 +54,10 @@ rule Coinhive_JS_Miner_Generic
         any of ($domain*)
         or
         // Probable: WebSocket mining behavior without explicit domain
-        (2 of ($ws*) and $sitekey)
+        2 of ($ws*)
         or
         // Suspicious: obfuscated payload with mining indicators
-        ($obf2 and any of ($ws*))
+        (any of ($obf*) and any of ($ws*))
 }
 
 
@@ -135,5 +132,5 @@ rule Generic_Browser_Cryptominer_Behavior
     condition:
         any of ($pool*) or
         (2 of ($generic*)) or
-        ($wasm1 and $wasm3)
+        (2 of ($wasm*))
 }

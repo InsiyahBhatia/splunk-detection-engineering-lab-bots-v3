@@ -7,13 +7,9 @@
 **Incident Date:** 2018-08-20  
 **Dataset:** BOTS v3 - Splunk Boss of the SOC (index=botsv3)
 
----
-
 ## Executive Summary
 
 On August 20, 2018, EC2 instance `mars.i-08e52f8b5a034012d` received a malicious payload (~11.7MB) from external IP `34.215.24.225` over non-standard port 9998. The malware subsequently queried the AWS Instance Metadata Service (IMDS) to steal temporary IAM credentials attached to the instance role. Using these credentials, the attacker minted an STS session token and conducted a systematic privilege escalation attempt followed by a multi-region EC2 resource hijacking sweep across 15 AWS regions (576 attempts). All resource provisioning attempts were blocked by IAM policy or AWS service quotas - no instances were successfully launched. Frothly's security team detected and revoked the stolen credentials within 14 minutes using `aws_ir`. However, the C2 channel on the compromised host remained active for at least 4 hours after credential revocation, indicating the underlying host compromise was not remediated within the dataset window.
-
----
 
 ## Timeline of Events
 
@@ -25,7 +21,7 @@ On August 20, 2018, EC2 instance `mars.i-08e52f8b5a034012d` received a malicious
 | 14:46:12 | `GetSessionToken` called with AKIA key - STS token `ASIAZB6TMXZ7LL6JBJQA` minted | aws:cloudtrail | T1078.004 - Valid Accounts: Cloud |
 | 14:46:12 | IAM enumeration burst: 6 API calls in <1 second (`GetCallerIdentity`, `GetSessionToken`, `ListAccessKeys`, `CreateAccessKey`, `DeleteAccessKey`, `CreateUser`) - all via Boto3 | aws:cloudtrail | T1580 - Cloud Infrastructure Discovery |
 | 14:46:12 | `CreateUser` (my_db_user) and `CreateAccessKey` denied - persistence attempt blocked | aws:cloudtrail | T1136.003 - Create Account: Cloud |
-| 14:47–14:57 | Multi-region `RunInstances` sweep - 576 attempts across 15 regions from 2 IPs | aws:cloudtrail | T1496 - Resource Hijacking |
+| 14:47-14:57 | Multi-region `RunInstances` sweep - 576 attempts across 15 regions from 2 IPs | aws:cloudtrail | T1496 - Resource Hijacking |
 | 15:00:53 | Frothly runs `aws_ir key-compromise --access-key-id AKIAJOGCDXJ5NW5PXUPA --plugins disableaccess_key` | osquery:results | - (IR Response) |
 | 15:03:59 | `aws_ir` re-executed (confirmation retry) | osquery:results | - |
 | 15:05:01 | `aws_ir` re-executed (confirmation retry) | osquery:results | - |
@@ -34,8 +30,6 @@ On August 20, 2018, EC2 instance `mars.i-08e52f8b5a034012d` received a malicious
 | 18:24:34 | Second large transfer - 2.9MB inbound, 59KB outbound (possible second stage) | stream:tcp | T1041 - Exfiltration Over C2 |
 
 **Detection-to-containment time: 14 minutes** (credential revocation only; host not cleaned)
-
----
 
 ## Attack Chain
 
@@ -71,8 +65,6 @@ On August 20, 2018, EC2 instance `mars.i-08e52f8b5a034012d` received a malicious
         C2 channel NOT terminated - beacons continue at 16:28, 16:33, 18:24
 ```
 
----
-
 ## Root Cause
 
 **EC2 Instance Metadata Service (IMDS) Credential Theft**
@@ -80,8 +72,6 @@ On August 20, 2018, EC2 instance `mars.i-08e52f8b5a034012d` received a malicious
 The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivered over TCP port 9998 from `34.215.24.225`. The malware queried the AWS IMDS endpoint at `169.254.169.254/latest/meta-data/iam/security-credentials/EC2InstanceRole` at 14:40:23 UTC, receiving HTTP 200 with temporary credentials for the `EC2InstanceRole` attached to the instance. These credentials (`AKIAJOGCDXJ5NW5PXUPA`) were then used to mint an STS session token and conduct downstream privilege escalation and resource hijacking attempts.
 
 **How the host itself was initially compromised:** Unknown - no exploit or initial access event was found in available telemetry prior to the 14:34 payload delivery. This represents a **detection gap**: the initial vector (phishing, vulnerable service, prior compromise) was not captured in the dataset window.
-
----
 
 ## Indicators of Compromise (IOCs)
 
@@ -95,9 +85,7 @@ The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivere
 | STS Token | `ASIAZB6TMXZ7LL6JBJQA` | Temporary token minted from stolen key |
 | Source IPs | `35.153.154.221`, `139.198.18.205` | IPs used during RunInstances sweep |
 | User-Agent | `Boto3/1.7.44 Python/2.7.12 Linux/4.4.0-1063-aws Botocore/1.10.44` | Attacker tooling fingerprint |
-| Tool | `aws_ir` | Defender IR tool (not attacker - positive finding) |
-
----
+ | Tool | `aws_ir` | Defender IR tool (not attacker - positive finding) |
 
 ## MITRE ATT&CK Mapping
 
@@ -112,9 +100,7 @@ The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivere
 | Persistence | Account Manipulation: Additional Cloud Credentials | T1098.001 | CreateAccessKey attempt - denied |
 | Privilege Escalation | Valid Accounts: Cloud Accounts | T1078.004 | STS token minted, used across 15 regions |
 | Impact | Resource Hijacking | T1496 | 576 RunInstances attempts - 0 successful |
-| Exfiltration | Exfiltration Over C2 Channel | T1041 | 2.9MB second transfer at 18:24 |
-
----
+ | Exfiltration | Exfiltration Over C2 Channel | T1041 | 2.9MB second transfer at 18:24 |
 
 ## Controls Assessment
 
@@ -129,9 +115,7 @@ The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivere
 - **Overpermissive EC2 instance role** - `EC2InstanceRole` had sufficient permissions to call `GetSessionToken` and attempt `RunInstances`; should be scoped to minimum required permissions
 - **No host-level isolation** - C2 channel remained active for 4+ hours after credential revocation; the host was not quarantined
 - **No network egress filtering** - outbound connection to `34.215.24.225:9998` was not blocked by perimeter controls
-- **CloudTrail gap** - `web_admin` IAM user creation (2018-08-19) has no corresponding CloudTrail `CreateUser` event; credential issuance was not audited
-
----
+ - **CloudTrail gap** - `web_admin` IAM user creation (2018-08-19) has no corresponding CloudTrail `CreateUser` event; credential issuance was not audited
 
 ## Evidence Gaps
 
@@ -140,9 +124,7 @@ The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivere
 | Initial host compromise vector unknown | Cannot determine patient zero or full blast radius |
 | `web_admin` account creation not in CloudTrail | Credential issuance timeline incomplete |
 | `34.215.24.225` ownership unconfirmed | Threat actor attribution not possible from available data |
-| Second large transfer at 18:24 (2.9MB) - content unknown | Cannot confirm exfiltration vs. second stage payload |
-
----
+ | Second large transfer at 18:24 (2.9MB) - content unknown | Cannot confirm exfiltration vs. second stage payload |
 
 ## Recommendations
 
@@ -159,9 +141,7 @@ The `mars.i-08e52f8b5a034012d` EC2 instance was compromised via malware delivere
 ### Long-term (P2)
 7. **Deploy network egress filtering** - outbound connections on non-standard ports (9998) should require explicit allow-listing
 8. **Secrets scanning on EC2 instances** - periodic osquery `process_envs` and file scans for AWS key patterns
-9. **AWS GuardDuty** - would have detected `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration` automatically
-
----
+ 9. **AWS GuardDuty** - would have detected `UnauthorizedAccess:IAMUser/InstanceCredentialExfiltration` automatically
 
 ## Queries Used (SPL Reference)
 
@@ -181,7 +161,5 @@ index="botsv3" "ASIAZB6TMXZ7LL6JBJQA" | stats dc(awsRegion) as regions_touched, 
 -- IR response confirmation
 index="botsv3" sourcetype="osquery:results" "AKIAJOGCDXJ5NW5PXUPA" | table _time host name columns.cmdline
 ```
-
----
 
 *Report generated from hands-on investigation of BOTS v3 dataset. All findings verified against raw telemetry - no claims made without supporting query evidence.*

@@ -30,8 +30,13 @@ detection:
             - DeleteAccessKey
             - CreateUser
             - GetSessionToken
+    condition: selection_sensitive_actions
+aggregation:
+    type: distinct_count
+    field: eventName
+    group_field: userIdentity.accessKeyId
+    condition: agg >= 4
     timeframe: 1m
-    condition: selection_sensitive_actions | count(eventName) by userIdentity.accessKeyId >= 4
 falsepositives:
     - Legitimate automated credential-rotation tooling or IAM auditing scripts.
     - CI/CD pipelines that provision IAM resources programmatically.

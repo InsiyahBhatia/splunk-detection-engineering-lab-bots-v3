@@ -23,8 +23,13 @@ detection:
     selection:
         eventSource: ec2.amazonaws.com
         eventName: RunInstances
+    condition: selection
+aggregation:
+    type: distinct_count
+    field: awsRegion
+    group_field: userIdentity.accessKeyId
+    condition: agg >= 5
     timeframe: 10m
-    condition: selection | count(awsRegion) by userIdentity.accessKeyId >= 5
 falsepositives:
     - Legitimate multi-region infrastructure-as-code deployments (Terraform,
       CloudFormation StackSets) launched by automation accounts.

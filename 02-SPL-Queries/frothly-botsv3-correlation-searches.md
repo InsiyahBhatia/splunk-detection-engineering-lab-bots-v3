@@ -4,7 +4,7 @@
 **Dataset:** index=botsv3  
 **Purpose:** Cross-data-source correlation searches linking CloudTrail, endpoint, DNS, and network telemetry to detect multi-stage attack chains.
 
----
+
 
 ## CS-001: IMDS Credential Theft > Cloud API Abuse
 
@@ -13,19 +13,18 @@ Correlates IMDS queries (stream:http) with subsequent CloudTrail activity to ide
 
 ### SPL
 ```spl
-index="botsv3" sourcetype="stream:http" dest_ip="169.254.169.254" uri_path="*iam/security-credentials*" http_method="GET"
-| eval imds_time = _time
-| table _time host as imds_host src_ip as instance_ip uri_path
-| join type=outer host
-    [ search index="botsv3" sourcetype="aws:cloudtrail"
-      | eval cloudtrail_time = _time
-      | table _time host userIdentity.accessKeyId userIdentity.arn eventName eventSource sourceIPAddress awsRegion errorCode
-      | rename host as ct_host ]
-| where ct_host == imds_host
-| eval time_diff = cloudtrail_time - imds_time
-| where time_diff >= 0 AND time_diff <= 900
-| sort imds_time
+index="botsv3" (sourcetype="stream:http" dest_ip="169.254.169.254" uri_path="*iam/security-credentials*") OR (sourcetype="aws:cloudtrail" userIdentity.accessKeyId="AKIAJOGCDXJ5NW5PXUPA")
+| eval event_type = case(sourcetype="stream:http", "IMDS_QUERY", sourcetype="aws:cloudtrail", "CLOUDTRAIL_API")
+| eval details = case(
+    sourcetype="stream:http", "IMDS credential query on " + host,
+    sourcetype="aws:cloudtrail" AND errorCode="AccessDenied", eventName + " (" + errorCode + ")",
+    sourcetype="aws:cloudtrail", eventName + " (success)"
+)
+| table _time event_type host details userIdentity.accessKeyId userIdentity.arn
+| sort _time
 ```
+
+**Note:** The `join` by `host` approach does not work here because CloudTrail logs show the log aggregator host (e.g. `splunk.froth.ly`) and the `stream:http` logs show the actual instance hostname (e.g. `mars.i-08e52f8b5a034012d`). The timeline-based correlation above uses time-adjacent event grouping instead and has been verified against IR-2018-001 where `mars` IMDS queries at 14:40:22 were followed by `web_admin` CloudTrail API calls at 14:46:12.
 
 ### MITRE ATT&CK
 - T1552.005 - Cloud Instance Metadata API (precursor)
@@ -35,7 +34,7 @@ index="botsv3" sourcetype="stream:http" dest_ip="169.254.169.254" uri_path="*iam
 ### Risk
 Critical - directly confirms credential theft to cloud control plane pivot.
 
----
+
 
 ## CS-002: IAM Recon Burst > Multi-Region RunInstances
 
@@ -50,9 +49,11 @@ index="botsv3" sourcetype="aws:cloudtrail" eventSource IN ("iam.amazonaws.com", 
     eventSource="iam.amazonaws.com" AND eventName IN ("GetCallerIdentity","ListAccessKeys","CreateAccessKey","DeleteAccessKey","CreateUser","GetSessionToken"), "reconnaissance",
     eventSource="ec2.amazonaws.com" AND eventName="RunInstances", "exploitation",
     true(), "other")
-| stats dc(eventName) as api_count, values(eventName) as api_calls, values(awsRegion) as regions, values(errorCode) as errors, values(phase) as phases by userIdentity.accessKeyId, _time
+| stats dc(eventName) as api_count, values(eventName) as api_calls, values(awsRegion) as regions, values(errorCode) as errors, values(phase) as phases, values(userIdentity.accessKeyId) as keys_used by userIdentity.arn, _time
 | search phases="reconnaissance" phases="exploitation"
 ```
+
+**Note:** Group by `userIdentity.arn` rather than `accessKeyId` because STS tokens minted from a compromised key have a different `accessKeyId` than the original long-term key, but inherit the same ARN. This was observed in IR-2018-001 where IAM recon used `AKIAJOGCDXJ5NW5PXUPA` and RunInstances used `ASIAZB6TMXZ7LL6JBJQA`, both under `arn:aws:iam::622676721278:user/web_admin`.
 
 ### MITRE ATT&CK
 - T1580 - Cloud Infrastructure Discovery (recon)
@@ -62,7 +63,7 @@ index="botsv3" sourcetype="aws:cloudtrail" eventSource IN ("iam.amazonaws.com", 
 ### Risk
 Critical - demonstrates full attack chain from enumeration to resource hijacking.
 
----
+
 
 ## CS-003: S3 Public ACL > Cryptominer Delivery > DNS Resolution
 
@@ -93,7 +94,7 @@ index="botsv3" sourcetype="aws:cloudtrail" eventName="PutBucketAcl"
 ### Risk
 High - links infrastructure misconfiguration to endpoint compromise.
 
----
+
 
 ## CS-004: C2 Beaconing on Non-Standard Port > Large Data Transfer
 
@@ -121,7 +122,7 @@ index="botsv3" sourcetype="stream:tcp" dest_port=9998
 ### Risk
 High - persistent C2 with large transfers indicates active post-exploitation.
 
----
+
 
 ## CS-005: AWS API Errors by Access Key - Privilege Escalation Attempts
 
@@ -145,7 +146,7 @@ index="botsv3" sourcetype="aws:cloudtrail"
 ### Risk
 High - mixed success/denied API calls suggest credential abuse with permission probing.
 
----
+
 
 ## Correlation Search Summary
 

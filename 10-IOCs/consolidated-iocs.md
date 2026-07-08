@@ -5,7 +5,7 @@
 **Source Incidents:** IR-2018-001, IR-2018-002, IR-2026-0701-001  
 **Classification:** TLP:AMBER
 
----
+
 
 ## Network Indicators
 
@@ -18,7 +18,7 @@
 | IPv4 | `139.198.18.205` | Source IP for RunInstances sweep (hijack phase) | IR-2018-001 / IR-2026-0701-001 | High |
 | IPv4 | `107.77.212.175` | bstoll's IP - source of both PutBucketAcl calls (accidental) | IR-2018-002 | High |
 
----
+
 
 ## Domain Indicators
 
@@ -31,7 +31,7 @@
 | Domain | `ws014.coinhive.com` | Coinhive WebSocket mining pool endpoint | IR-2018-002 | High |
 | Domain | `brewertalk.com` | Frothly beer community forum (54.67.127.227) - miner delivery vector | IR-2018-002 | High |
 
----
+
 
 ## Host & Identity Indicators
 
@@ -47,7 +47,7 @@
 | IAM User | `mkraeus` | Employee associated with MKRAEUS-L endpoint | IR-2018-002 | Medium |
 | IAM User | `BillyTun` | User logged into BTUN-L when miner blocked | IR-2018-002 | Medium |
 
----
+
 
 ## Credential & Token Indicators
 
@@ -57,7 +57,7 @@
 | Access Key ID (ASIA) | `ASIAZB6TMXZ7LL6JBJQA` | STS temporary session token minted from stolen AKIA - used for all downstream abuse | IR-2018-001 / IR-2026-0701-001 | High |
 | IAM Role | `EC2InstanceRole` | Instance profile attached to mars - source of stolen IMDS credentials | IR-2018-001 | High |
 
----
+
 
 ## File & Payload Indicators
 
@@ -69,7 +69,7 @@
 | S3 Bucket | `frothlywebcode` | Publicly writable for 56 min; hosted Coinhive JS payload | IR-2018-002 | High |
 | Filename Pattern | `*.js` (Coinhive miner) | Malicious JavaScript uploaded to frothlywebcode - exact filename unknown (S3 access log parsing gap) | IR-2018-002 | Medium |
 
----
+
 
 ## Tooling & Behavioral Indicators
 
@@ -81,7 +81,7 @@
 | AV Signature | `JSCoinminer Download 6` (SID 30356) | Symantec EP detection on BTUN-L at 19:12:22 | IR-2018-002 | High |
 | AV Signature | `JSCoinminer Download 8` (SID 30358) | Symantec EP detection on BTUN-L at 19:13:24 | IR-2018-002 | High |
 
----
+
 
 ## MITRE ATT&CK Technique Summary by Incident
 
@@ -104,7 +104,7 @@
 | T1526 | Cloud Service Discovery | | | ✓ |
 | T1552.001 | Credentials In Files | | | ✓ |
 
----
+
 
 ## Detection Rules Referenced
 
@@ -117,7 +117,7 @@
 | `06-Zeek/zeek-c2-beacon-detection.zeek` | - | T1571 |
 | `06-Zeek/zeek-imds-credential-theft.zeek` | - | T1552.005 |
 
----
+
 
 ## Evidence Gaps (Consolidated)
 
@@ -133,7 +133,7 @@
 | brewertalk.com server-side logs not in dataset | IR-2018-002 | Cannot confirm script injection method |
 | Root cause of `web_admin` credential compromise unknown | IR-2026-0701-001 | Phishing vs. leak vs. other vector undetermined |
 
----
+
 
 ## Recommended Blocking / Hunting Actions
 
@@ -171,7 +171,5 @@ index="botsv3" sourcetype="stream:dns" (query="*coinhive*" OR query="*monero*")
 index="botsv3" sourcetype="aws:cloudtrail" eventName=PutBucketAcl
 | table _time userIdentity.userName requestParameters.bucketName requestParameters.AccessControlPolicy sourceIPAddress
 ```
-
----
 
 *All IOCs extracted from raw BOTSv3 telemetry via Splunk queries documented in each incident report. No third-party intel feeds used. Confidence ratings: High = directly observed in dataset; Medium = inferred from correlated events.*

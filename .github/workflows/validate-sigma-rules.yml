@@ -45,4 +45,4 @@ jobs:
 
       - name: Summary
         if: success()
-        run: echo "✅ All Sigma rules passed schema validation and Splunk SPL conversion."
+        run: echo "All Sigma rules passed schema validation and Splunk SPL conversion."

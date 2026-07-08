@@ -7,35 +7,29 @@
 **Incident Date:** 2018-08-20  
 **Dataset:** BOTS v3 - Splunk Boss of the SOC (index=botsv3)
 
----
-
 ## Executive Summary
 
-On August 20, 2018, Frothly employee `bstoll` accidentally misconfigured the AWS S3 bucket `frothlywebcode`, making it publicly writable for approximately 56 minutes (18:31–19:27 UTC). During this window, an attacker uploaded a malicious JavaScript Coinhive cryptominer payload to the bucket. The miner was subsequently delivered via `brewertalk.com` (Frothly's beer community forum, hosted at `54.67.127.227`) to visiting employees. At least three endpoints - `BSTOLL-L` (bstoll), `MKRAEUS-L` (mkraeus), and `BTUN-L` (BillyTun) - resolved Coinhive mining infrastructure domains. Symantec Endpoint Protection detected and blocked the miner on `BTUN-L`, identifying the threat as `JSCoinminer Download 6/8`. The bucket ACL was corrected by `bstoll` at 19:27 UTC, 56 minutes after the initial misconfiguration. S3 upload logs confirming the exact payload filename are unavailable due to a field parsing limitation in the dataset.
-
----
+On August 20, 2018, Frothly employee `bstoll` accidentally misconfigured the AWS S3 bucket `frothlywebcode`, making it publicly writable for approximately 56 minutes (18:31-19:27 UTC). During this window, an attacker uploaded a malicious JavaScript Coinhive cryptominer payload to the bucket. The miner was subsequently delivered via `brewertalk.com` (Frothly's beer community forum, hosted at `54.67.127.227`) to visiting employees. At least three endpoints - `BSTOLL-L` (bstoll), `MKRAEUS-L` (mkraeus), and `BTUN-L` (BillyTun) - resolved Coinhive mining infrastructure domains. Symantec Endpoint Protection detected and blocked the miner on `BTUN-L`, identifying the threat as `JSCoinminer Download 6/8`. The bucket ACL was corrected by `bstoll` at 19:27 UTC, 56 minutes after the initial misconfiguration. S3 upload logs confirming the exact payload filename are unavailable due to a field parsing limitation in the dataset.
 
 ## Timeline of Events
 
 | Time (UTC) | Event | Source | MITRE Technique |
 |---|---|---|---|
 | 18:31:46 | `bstoll` calls `PutBucketAcl` on `frothlywebcode` - bucket made publicly accessible | aws:cloudtrail | T1530 - Data from Cloud Storage |
-| 18:31–19:27 | **56-minute exposure window** - bucket publicly writable | aws:cloudtrail | - |
-| ~18:35–18:45 | Attacker uploads Coinhive JS payload to `frothlywebcode` S3 bucket | aws:s3:accesslogs (field gap) | T1608 - Stage Capabilities |
+| 18:31-19:27 | **56-minute exposure window** - bucket publicly writable | aws:cloudtrail | - |
+| ~18:35-18:45 | Attacker uploads Coinhive JS payload to `frothlywebcode` S3 bucket | aws:s3:accesslogs (field gap) | T1608 - Stage Capabilities |
 | 18:48:25 | `BSTOLL-L` (bstoll) browses `brewertalk.com` via Chrome - hits `/index.php`, `/forumdisplay.php`, `/showthread.php` from `54.67.127.227` | stream:http | T1189 - Drive-By Compromise |
 | 18:57:47 | `MKRAEUS-L` resolves Coinhive mining domains via DNS | stream:dns | T1496 - Resource Hijacking |
 | 19:08:19 | `BSTOLL-L` resolves `coinhive.com`, `ws001/005/011/014.coinhive.com` - miner active | stream:dns | T1496 - Resource Hijacking |
 | 19:09:20 | `BSTOLL-L` continues resolving Coinhive WebSocket mining pool endpoints | stream:dns | T1496 |
 | 19:12:22 | Symantec EP detects miner on `BTUN-L` - `JSCoinminer Download 6` blocked (SID 30356) | symantec:ep:security:file | T1496 |
 | 19:13:24 | Symantec blocks `JSCoinminer Download 8` on `BTUN-L` (SID 30358) | symantec:ep:security:file | - |
-| 19:13–19:14 | Additional Symantec blocks across detection window (46 total events) | symantec:ep:security:file | - |
+| 19:13-19:14 | Additional Symantec blocks across detection window (46 total events) | symantec:ep:security:file | - |
 | 19:27:54 | `bstoll` calls `PutBucketAcl` again - bucket ACL corrected, exposure ends | aws:cloudtrail | - (Remediation) |
 
 **Exposure window: 56 minutes**  
 **Endpoints with confirmed miner activity: 3** (BSTOLL-L, MKRAEUS-L, BTUN-L)  
-**Miner blocked by SEP on: BTUN-L confirmed; BSTOLL-L and MKRAEUS-L status unconfirmed**
-
----
+ **Miner blocked by SEP on: BTUN-L confirmed; BSTOLL-L and MKRAEUS-L status unconfirmed**
 
 ## Attack Chain
 
@@ -74,8 +68,6 @@ On August 20, 2018, Frothly employee `bstoll` accidentally misconfigured the AWS
         | Exposure window closed
 ```
 
----
-
 ## Root Cause
 
 **AWS S3 Bucket Misconfiguration by Privileged User**
@@ -85,8 +77,6 @@ IAM user `bstoll` (source IP `107.77.212.175`) called `PutBucketAcl` on S3 bucke
 The attacker who exploited the open bucket and how they were monitoring for exposed S3 buckets (e.g., automated scanner, prior knowledge) is unknown from available telemetry.
 
 **How the forum was connected:** `brewertalk.com` (54.67.127.227) appears to serve content sourced from the `frothlywebcode` S3 bucket. The injected miner script was delivered via forum pages, indicating the attacker embedded a script tag pointing to the malicious S3 object within the forum's HTML. Whether the attacker also had direct write access to the forum server is unconfirmed.
-
----
 
 ## Indicators of Compromise (IOCs)
 
@@ -101,9 +91,7 @@ The attacker who exploited the open bucket and how they were monitoring for expo
 | Threat Name | `JSCoinminer Download 6` (SID 30356) | Symantec EP signature |
 | Threat Name | `JSCoinminer Download 8` (SID 30358) | Symantec EP signature |
 | Infected Hosts | `BSTOLL-L`, `MKRAEUS-L`, `BTUN-L` | Endpoints resolving Coinhive domains |
-| User | `BillyTun` | User on BTUN-L when miner was blocked |
-
----
+ | User | `BillyTun` | User on BTUN-L when miner was blocked |
 
 ## MITRE ATT&CK Mapping
 
@@ -112,9 +100,7 @@ The attacker who exploited the open bucket and how they were monitoring for expo
 | Initial Access | Drive-By Compromise | T1189 | Coinhive JS delivered via brewertalk.com browsing session in Chrome |
 | Resource Development | Stage Capabilities: Upload Tool | T1608 | Attacker uploaded miner payload to exposed S3 bucket |
 | Collection | Data from Cloud Storage | T1530 | S3 bucket `frothlywebcode` publicly writable (misconfiguration) |
-| Impact | Resource Hijacking | T1496 | Coinhive Monero miner executing in employee browsers via WebSocket connections to ws001–014.coinhive.com |
-
----
+ | Impact | Resource Hijacking | T1496 | Coinhive Monero miner executing in employee browsers via WebSocket connections to ws001-014.coinhive.com |
 
 ## Controls Assessment
 
@@ -127,9 +113,7 @@ The attacker who exploited the open bucket and how they were monitoring for expo
 - **No S3 bucket policy enforcing block-public-access** - AWS Block Public Access settings (available since 2018) would have prevented `PutBucketAcl` from granting public permissions regardless of user action
 - **No S3 access logging with alerting** - public write attempts should trigger immediate alert; upload events during exposure window not queryable in available telemetry
 - **No DNS sinkholes or category filtering** - `coinhive.com` and mining pool domains should be blocked at DNS resolver level; all three endpoints resolved freely
-- **SEP status on BSTOLL-L and MKRAEUS-L unclear** - DNS evidence confirms miner activity; no Symantec block events found for these two hosts, suggesting either SEP was not installed or signatures were not current
-
----
+ - **SEP status on BSTOLL-L and MKRAEUS-L unclear** - DNS evidence confirms miner activity; no Symantec block events found for these two hosts, suggesting either SEP was not installed or signatures were not current
 
 ## Evidence Gaps
 
@@ -138,9 +122,7 @@ The attacker who exploited the open bucket and how they were monitoring for expo
 | S3 access logs `bucket_name` field not parseable in dataset | Cannot confirm exact payload filename, upload size, or attacker source IP for the upload |
 | How attacker discovered the open bucket is unknown | Attribution and attack vector into the broader campaign unclear |
 | BSTOLL-L and MKRAEUS-L miner containment status unconfirmed | Unknown whether CPU mining continued after the S3 bucket was closed |
-| brewertalk.com server-side logs not in dataset | Cannot confirm how miner script was injected into forum HTML |
-
----
+ | brewertalk.com server-side logs not in dataset | Cannot confirm how miner script was injected into forum HTML |
 
 ## Recommendations
 
@@ -156,9 +138,7 @@ The attacker who exploited the open bucket and how they were monitoring for expo
 
 ### Long-term (P2)
 7. **IAM policy: require MFA for S3 ACL changes** - `bstoll` changed a bucket ACL from what appears to be a standard session; require `aws:MultiFactorAuthPresent: true` for destructive S3 permission changes
-8. **Implement S3 bucket ownership controls** - enforce `BucketOwnerEnforced` ACL policy to disable ACL-based access entirely, using bucket policies only
-
----
+ 8. **Implement S3 bucket ownership controls** - enforce `BucketOwnerEnforced` ACL policy to disable ACL-based access entirely, using bucket policies only
 
 ## Relationship to IR-2018-001
 
@@ -171,9 +151,7 @@ These are **two separate, parallel incidents** on the same date with no confirme
 | Impact | Credential abuse, attempted EC2 hijacking | Drive-by cryptominer on 3 endpoints |
 | Containment | Key revoked in 14 min (aws_ir) | Bucket closed in 56 min (manual) |
 
-The two incidents share no common IPs, users, or tooling. Coincidence of date is noted but no causal link found in available telemetry.
-
----
+ The two incidents share no common IPs, users, or tooling. Coincidence of date is noted but no causal link found in available telemetry.
 
 ## Queries Used (SPL Reference)
 
@@ -194,7 +172,5 @@ index="botsv3" host="BSTOLL-L" sourcetype="stream:http"
 -- Symantec EP detections (raw event expansion)
 index="botsv3" sourcetype="symantec:ep:security:file" (*coin* OR *coinhive*) | head 5
 ```
-
----
 
 *Report generated from hands-on investigation of BOTS v3 dataset. All claims verified against raw telemetry. Evidence gaps explicitly documented rather than inferred.*

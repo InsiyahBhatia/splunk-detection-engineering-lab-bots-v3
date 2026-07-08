@@ -4,7 +4,7 @@
 **Dataset:** index=botsv3  
 **Coverage:** IR-2018-001, IR-2018-002, IR-2026-0701-001
 
----
+
 
 ## Scenario 1: IMDS Credential Theft Detection
 
@@ -36,7 +36,7 @@ Refer to `03-Sigma/aws_iam_reconnaissance_burst.yml`
 - Normal IMDS access: AWS SDKs, CloudWatch agent, SSM agent, custom apps
 - Alert on: IMDS queries from unknown process names, outside expected application profiles, followed by AWS API calls
 
----
+
 
 ## Scenario 2: Multi-Region RunInstances Sweep
 
@@ -66,10 +66,10 @@ index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com" event
 Refer to `03-Sigma/aws_ec2_runinstances_multi_region_sweep.yml`
 
 ### Baseline
-- Normal: Infrastructure-as-code deployments within 1–3 regions
+- Normal: Infrastructure-as-code deployments within 1-3 regions
 - Alert on: 5+ regions in 10 minutes from same access key
 
----
+
 
 ## Scenario 3: IAM Reconnaissance & Privilege Escalation Attempts
 
@@ -105,7 +105,7 @@ Refer to `03-Sigma/aws_iam_reconnaissance_burst.yml`
 - Normal: CI/CD pipelines creating/deleting keys at expected intervals
 - Alert on: Mixed success+denied calls indicating enumeration
 
----
+
 
 ## Scenario 4: Drive-By Cryptominer Delivery via S3
 
@@ -146,7 +146,7 @@ index="botsv3" host="BSTOLL-L" sourcetype="stream:http" dest_ip="54.67.127.227"
 - Normal: Occasional S3 ACL changes by storage admins
 - Alert on: Public ACL grants by non-admin users or outside change windows
 
----
+
 
 ## Scenario 5: Non-Standard Port C2 Beaconing
 
@@ -170,7 +170,7 @@ Refer to `05-Snort/snort-c2-port9998.rules`
 - Normal: Zero expected traffic on port 9998 in a brewery company environment
 - Any traffic on port 9998 is suspicious
 
----
+
 
 ## Hunting Runbook Summary
 
@@ -182,7 +182,7 @@ Refer to `05-Snort/snort-c2-port9998.rules`
 | P1 | Drive-by cryptominer | stream:dns, symantec:ep:security:file | Cryptomining domain resolution + AV blocks |
 | P2 | Non-standard port C2 | stream:tcp, stream:udp | Traffic on port 9998 or other unusual ports |
 
----
+
 
 ## Analytics & Correlations Across Incidents
 
@@ -217,7 +217,5 @@ index="botsv3" (sourcetype="stream:dns" query="*coinhive*") OR
          by host
 | where indicator_count >= 1
 ```
-
----
 
 *All queries tested against BOTSv3 dataset (index=botsv3). Adjust time ranges and field names for other environments.*

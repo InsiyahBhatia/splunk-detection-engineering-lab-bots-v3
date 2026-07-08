@@ -4,7 +4,7 @@
 **Dataset:** index=botsv3  
 **Purpose:** Standalone queries used during IR-2018-001, IR-2018-002, and IR-2026-0701-001 analysis
 
----
+
 
 ## 1. Initial Triage & Identity Discovery
 
@@ -41,7 +41,7 @@ index="botsv3" host="mars.i-08e52f8b5a034012d" sourcetype="stream:http"
 | table _time src_ip dest_ip dest_port uri_path http_method status
 ```
 
----
+
 
 ## 2. CloudTrail - EC2
 
@@ -90,7 +90,7 @@ index="botsv3" sourcetype="aws:cloudtrail" eventSource="ec2.amazonaws.com"
 | sort - count
 ```
 
----
+
 
 ## 3. CloudTrail - IAM
 
@@ -123,7 +123,7 @@ index="botsv3" sourcetype="aws:cloudtrail" eventSource="iam.amazonaws.com"
 | sort _time
 ```
 
----
+
 
 ## 4. CloudTrail - S3
 
@@ -150,7 +150,7 @@ index="botsv3" sourcetype="aws:s3:accesslogs"
 | table _time requester operation key remote_ip http_status bytes_sent
 ```
 
----
+
 
 ## 5. Network - C2 Beaconing
 
@@ -184,7 +184,7 @@ index="botsv3" host="mars.i-08e52f8b5a034012d" dest_ip="34.215.24.225"
 | where beacon_count > 0
 ```
 
----
+
 
 ## 6. Network - DNS
 
@@ -204,7 +204,7 @@ index="botsv3" sourcetype="stream:dns" query="*coinhive*"
 | sort - count
 ```
 
----
+
 
 ## 7. Endpoint - Symantec EP
 
@@ -230,7 +230,7 @@ index="botsv3" sourcetype="symantec:ep:security:file"
 | sort - count
 ```
 
----
+
 
 ## 8. Endpoint - HTTP Browsing
 
@@ -249,7 +249,7 @@ index="botsv3" sourcetype="stream:http" dest_ip="54.67.127.227"
 | sort - count
 ```
 
----
+
 
 ## 9. OSQuery - IR Response
 
@@ -266,7 +266,7 @@ index="botsv3" host="mars.i-08e52f8b5a034012d" sourcetype="osquery:results"
 | sort _time
 ```
 
----
+
 
 ## 10. Cross-Data-Source Correlations
 
@@ -330,7 +330,7 @@ index="botsv3" sourcetype="aws:cloudtrail"
 | sort - count
 ```
 
----
+
 
 ## Query Reference
 

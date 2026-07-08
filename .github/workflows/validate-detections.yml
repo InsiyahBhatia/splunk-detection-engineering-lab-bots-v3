@@ -1,0 +1,81 @@
+name: Validate Detection Rules
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - '04-YARA/**'
+      - '05-Snort/**'
+      - '06-Zeek/**'
+      - '.github/workflows/validate-detections.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - '04-YARA/**'
+      - '05-Snort/**'
+      - '06-Zeek/**'
+      - '.github/workflows/validate-detections.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-yara:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install YARA
+        run: sudo apt-get update && sudo apt-get install -y yara
+      - name: Compile YARA rules
+        run: yarac 04-YARA/yara-coinhive-miner.yar /tmp/test.yarc
+      - name: Test positive sample
+        run: |
+          printf 'var m = new CoinHive.Anonymous("KEY"); m.start();\n' > /tmp/pos.js
+          result=$(yara 04-YARA/yara-coinhive-miner.yar /tmp/pos.js)
+          echo "$result"
+          if echo "$result" | grep -q "Coinhive_JS_Miner_Generic"; then
+            echo "PASS: positive sample detected"
+          else
+            echo "FAIL: positive sample not detected"
+            exit 1
+          fi
+      - name: Test negative sample
+        run: |
+          printf '' > /tmp/neg.js
+          result=$(yara 04-YARA/yara-coinhive-miner.yar /tmp/neg.js)
+          if [ -z "$result" ]; then
+            echo "PASS: clean file ignored"
+          else
+            echo "FAIL: clean file triggered alert"
+            echo "$result"
+            exit 1
+          fi
+
+  validate-snort:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Snort 3 rule syntax
+        run: |
+          RULES="05-Snort/snort-c2-port9998.rules"
+          echo "=== Checking SIDs ==="
+          for sid in 9000001 9000002 9000003 9000005; do
+            grep -q "sid:$sid;" "$RULES" && echo "  SID $sid: present" || { echo "  SID $sid: MISSING"; exit 1; }
+          done
+          echo "=== Checking Snort 3 syntax (no \$ variables) ==="
+          if grep -q '\$HOME_NET' "$RULES"; then echo "FAIL: contains \$HOME_NET (Snort 2 syntax)"; exit 1; else echo "  No \$HOME_NET — OK"; fi
+          if grep -q '\$EXTERNAL_NET' "$RULES"; then echo "FAIL: contains \$EXTERNAL_NET (Snort 2 syntax)"; exit 1; else echo "  No \$EXTERNAL_NET — OK"; fi
+          echo "=== All checks passed ==="
+
+  validate-zeek:
+    runs-on: ubuntu-latest
+    container: zeek/zeek
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax-check Zeek scripts
+        run: |
+          python3 << 'EOF'
+          import struct
+          with open('/tmp/empty.pcap', 'wb') as f:
+              f.write(struct.pack('<IHHiIII', 0xa1b2c3d4, 2, 4, 0, 0, 65535, 1))
+          EOF
+          zeek -C -r /tmp/empty.pcap $GITHUB_WORKSPACE/06-Zeek/zeek-imds-credential-theft.zeek $GITHUB_WORKSPACE/06-Zeek/zeek-c2-beacon-detection.zeek
+          echo "PASS: Zeek scripts loaded successfully"
