@@ -31,7 +31,8 @@ Detection-Engineering-Lab/
 │   └── Attack-Timeline.md           # Chronological attack chain across both incidents
 │
 ├── 02-SPL-Queries/
-│   └── investigation-queries.md     # All SPL used during investigation with annotations
+│   ├── frothly-botsv3-spl-queries.md             # All SPL used during investigation with annotations
+│   └── frothly-botsv3-correlation-searches.md    # Cross-correlation and multi-stage hunting SPL
 │
 ├── 03-Sigma/
 │   ├── aws_iam_reconnaissance_burst.yml

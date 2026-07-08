@@ -55,7 +55,7 @@ snort -c ~/snort-config/snort.lua --warn-all
 ## 3. Test YARA Rules
 
 ```bash
-cd scripts
+cd 13-Detection-Pack/scripts
 chmod +x test-yara.sh
 ./test-yara.sh
 ```
